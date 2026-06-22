@@ -194,7 +194,7 @@ with st.container(border=True):
         stop_prompt="⏹️ Finalizar e Processar",
         just_once=False,
         use_container_width=True,
-        format="webm",
+        format="wav",
         key="mic_recorder_component"
     )
 
