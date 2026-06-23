@@ -185,7 +185,7 @@ if "transcription_path" not in st.session_state:
 
 # Interface widgets for live recording
 st.markdown("### 🎙️ Gravar Consulta")
-st.write("Clique no botão abaixo para gravar a consulta. O áudio será processado e transcrevido automaticamente ao finalizar.")
+st.write("Clique no botão abaixo para gravar a consulta. O áudio será processado e transcrito automaticamente ao finalizar.")
 
 # Use native container with border and background styling
 with st.container(border=True):
