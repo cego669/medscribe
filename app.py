@@ -211,21 +211,41 @@ if not check_password():
 
 # Sidebar configuration with Navigation Menu
 with st.sidebar:
-    st.markdown("### 🩺 Portal Clínico")
+    st.markdown("## 🩺 MedScribe")
+    st.caption("Painel de Navegação do Especialista")
     
-    # Adicionado o menu de navegação aqui
+    st.markdown("---")
+    
+    # Menu de navegação mais limpo e direto
     menu_selecionado = st.radio(
-        "Navegação",
-        ["🎙️ Gravação e Transcrição", "📄 Geração de Relatório"]
+        "Módulos do Sistema",
+        ["🎙️ Gravação e Transcrição", "📄 Geração de Relatório"],
+        label_visibility="collapsed"
     )
     
     st.markdown("---")
-    st.markdown("Bem-vindo ao sistema.")
-    st.info("O sistema divide a gravação automaticamente entre os oradores identificados (Orador 1 e Orador 2).")
+    
+    st.markdown("### ℹ️ Sobre o MedScribe")
+    st.markdown(
+        """
+        <div style="font-size: 13.5px; color: #475569; line-height: 1.5;">
+        Plataforma de inteligência artificial desenvolvida para otimizar o fluxo de trabalho médico.
+        <br><br>
+        <b>Recursos Ativos:</b>
+        <br>🔒 Privacidade e processamento seguro
+        <br>🎙️ Diarização inteligente de oradores
+        <br>📝 Geração automatizada de laudos
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     
     st.markdown("---")
-    if st.button("Sair do Sistema", type="secondary", use_container_width=True):
+    
+    if st.button("Sair da Sessão", type="secondary", use_container_width=True):
         logout()
+        
+    st.caption("MedScribe v1.0.0 | Ambiente Seguro")
 
 # Main Application Banner
 st.markdown(
@@ -453,7 +473,7 @@ def pagina_geracao_relatorio():
     if st.session_state.get("relatorio_final"):
         with st.container(border=True):
             st.markdown("#### Pré-visualização e Edição da Nota")
-            st.info("Você pode editar o texto abaixo antes de baixar o documento. As alterações serão incluídas no arquivo final.")
+            st.info("Você pode editar o texto abaixo. Ao terminar, clique no botão para preparar seu arquivo.")
             
             relatorio_editado = st.text_area(
                 "Resultado", 
@@ -462,16 +482,26 @@ def pagina_geracao_relatorio():
                 label_visibility="collapsed"
             )
             
-            with st.spinner("Preparando documento para download..."):
-                docx_buffer = criar_docx_em_memoria(relatorio_editado)
+            # Inicializa o buffer na sessão se não existir
+            if "docx_buffer" not in st.session_state:
+                st.session_state["docx_buffer"] = criar_docx_em_memoria(st.session_state["relatorio_final"])
             
-            st.download_button(
-                label="📥 Baixar Relatório (.docx)",
-                data=docx_buffer,
-                file_name="Nota_Clinica.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🔄 Atualizar Arquivo DOCX", type="secondary", use_container_width=True):
+                    with st.spinner("Gerando arquivo atualizado..."):
+                        st.session_state["docx_buffer"] = criar_docx_em_memoria(relatorio_editado)
+                        st.success("Arquivo atualizado com sucesso!")
+            
+            with col2:
+                st.download_button(
+                    label="📥 Baixar Relatório (.docx)",
+                    data=st.session_state["docx_buffer"],
+                    file_name="Nota_Clinica.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
+                )
 
 
 # ==========================================
