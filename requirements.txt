@@ -60,3 +60,4 @@ PyMuPDF==1.24.1
 pytesseract==0.3.10
 python-docx==1.1.2
 google-genai==0.2.0
+htmldocx==0.0.6
