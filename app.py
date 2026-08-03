@@ -233,8 +233,8 @@ with st.sidebar:
         <br><br>
         <b>Recursos Ativos:</b>
         <br>🔒 Privacidade e processamento seguro
-        <br>🎙️ Transcrição e Diarização inteligente de oradores em áudios de consultas médicas
-        <br>📝 Geração automatizada de Relatórios, gerados analisando laudos e áudio de consulta
+        <br>🎙️ Transcrição e Diarização inteligente
+        <br>📝 Geração automatizada de Relatórios
         </div>
         """,
         unsafe_allow_html=True
