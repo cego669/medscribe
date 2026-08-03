@@ -229,12 +229,12 @@ with st.sidebar:
     st.markdown(
         """
         <div style="font-size: 13.5px; color: #475569; line-height: 1.5;">
-        Plataforma de inteligência artificial desenvolvida para otimizar o fluxo de trabalho médico.
+        Plataforma de Inteligência Artificial desenvolvida para otimizar o fluxo de trabalho médico.
         <br><br>
         <b>Recursos Ativos:</b>
         <br>🔒 Privacidade e processamento seguro
-        <br>🎙️ Diarização inteligente de oradores
-        <br>📝 Geração automatizada de laudos
+        <br>🎙️ Transcrição e Diarização inteligente de oradores em áudios de consultas médicas
+        <br>📝 Geração automatizada de Relatórios, gerados analisando laudos e áudio de consulta
         </div>
         """,
         unsafe_allow_html=True
@@ -252,7 +252,7 @@ st.markdown(
     """
     <div class="app-header">
         <h1>🩺 MedScribe</h1>
-        <p>Assistente Digital para Transcrição de Consultas Clínicas</p>
+        <p>Assistente Digital para Transcrição de Consultas Clínicas e Geração de Relatórios</p>
     </div>
     """,
     unsafe_allow_html=True
