@@ -482,19 +482,16 @@ def pagina_geracao_relatorio():
                 label_visibility="collapsed"
             )
             
-            # Inicializa o buffer na sessão se não existir
-            if "docx_buffer" not in st.session_state:
-                st.session_state["docx_buffer"] = criar_docx_em_memoria(st.session_state["relatorio_final"])
+            # Limpa o buffer de download se o usuário modificar o texto (opcional, para forçar a regeração)
+            # Mas vamos seguir o fluxo exato: um botão gera o DOCX, e depois aparece o de download.
             
-            col1, col2 = st.columns(2)
+            if st.button("Gerar Documento Formatado para Download", type="primary", use_container_width=True):
+                with st.spinner("Empacotando documento em formato Word..."):
+                    st.session_state["docx_buffer"] = criar_docx_em_memoria(relatorio_editado)
+                    st.session_state["docx_pronto"] = True
+                    st.success("Documento formatado gerado com sucesso!")
             
-            with col1:
-                if st.button("🔄 Atualizar Arquivo DOCX", type="secondary", use_container_width=True):
-                    with st.spinner("Gerando arquivo atualizado..."):
-                        st.session_state["docx_buffer"] = criar_docx_em_memoria(relatorio_editado)
-                        st.success("Arquivo atualizado com sucesso!")
-            
-            with col2:
+            if st.session_state.get("docx_pronto") and "docx_buffer" in st.session_state:
                 st.download_button(
                     label="📥 Baixar Relatório (.docx)",
                     data=st.session_state["docx_buffer"],
