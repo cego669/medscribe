@@ -56,3 +56,7 @@ urllib3==2.7.0
 uvicorn==0.49.0
 watchdog==6.0.0
 websockets==16.0
+PyMuPDF==1.24.1
+pytesseract==0.3.10
+python-docx==1.1.2
+google-genai==0.2.0

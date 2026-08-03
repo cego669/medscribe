@@ -3,6 +3,7 @@ import streamlit as st
 from modules.auth import check_password, logout
 from modules.audio_processor import clear_previous_files, save_and_preprocess
 from modules.transcriber import transcribe_audio
+from modules.report_generator import extrair_texto_pdf, gerar_nota_clinica, criar_docx_em_memoria
 from streamlit_mic_recorder import mic_recorder
 
 # Set page settings and appearance
@@ -152,10 +153,18 @@ st.markdown(
 if not check_password():
     st.stop()
 
-# Sidebar configuration
+# Sidebar configuration with Navigation Menu
 with st.sidebar:
     st.markdown("### 🩺 Portal Clínico")
-    st.markdown("Bem-vindo ao sistema de transcrição de consultas.")
+    
+    # Adicionado o menu de navegação aqui
+    menu_selecionado = st.radio(
+        "Navegação",
+        ["🎙️ Gravação e Transcrição", "📄 Geração de Relatório"]
+    )
+    
+    st.markdown("---")
+    st.markdown("Bem-vindo ao sistema.")
     st.info("O sistema divide a gravação automaticamente entre os oradores identificados (Orador 1 e Orador 2).")
     
     st.markdown("---")
@@ -183,21 +192,6 @@ if "transcription_text" not in st.session_state:
 if "transcription_path" not in st.session_state:
     st.session_state["transcription_path"] = None
 
-# Interface widgets for live recording
-st.markdown("### 🎙️ Gravar Consulta")
-st.write("Clique no botão abaixo para gravar a consulta. O áudio será processado e transcrito automaticamente ao finalizar.")
-
-# Use native container with border and background styling
-with st.container(border=True):
-    audio_data = mic_recorder(
-        start_prompt="🔴 Iniciar Gravação",
-        stop_prompt="⏹️ Finalizar e Processar",
-        just_once=False,
-        use_container_width=True,
-        format="wav",
-        key="mic_recorder_component"
-    )
-
 # Helper function to parse transcript lines into speaker tags and timestamps
 def parse_line(line_str):
     try:
@@ -210,126 +204,200 @@ def parse_line(line_str):
         pass
     return None, None, line_str
 
-# Check if a new recording has been sent from the browser
-if audio_data is not None:
-    current_bytes = audio_data["bytes"]
-    
-    # Detect if it's a new audio session
-    if current_bytes != st.session_state["last_processed_audio_bytes"]:
-        # Rule: Deletes the last report and last audio file automatically
-        clear_previous_files()
-        
-        # Reset local session states
-        st.session_state["last_processed_audio_bytes"] = current_bytes
-        st.session_state["preprocessed_audio_path"] = None
-        st.session_state["transcription_text"] = None
-        st.session_state["transcription_path"] = None
-        
-        # Step 1: Preprocess with FFmpeg
-        with st.spinner("🧹 Limpando áudio e ajustando frequências (FFmpeg)..."):
-            try:
-                mime_type = audio_data.get("format", "audio/webm")
-                final_wav = save_and_preprocess(current_bytes, mime_type)
-                st.session_state["preprocessed_audio_path"] = final_wav
-                st.success("✔️ Áudio pré-processado com sucesso!")
-            except Exception as e:
-                st.error(f"Falha ao pré-processar o áudio: {e}")
-        
-        # Step 2: Transcribe via AssemblyAI with Diarization
-        if st.session_state["preprocessed_audio_path"]:
-            with st.spinner("☁️ Analisando e identificando vozes (AssemblyAI)..."):
-                try:
-                    txt, txt_path = transcribe_audio(st.session_state["preprocessed_audio_path"])
-                    st.session_state["transcription_text"] = txt
-                    st.session_state["transcription_path"] = txt_path
-                    st.success("✔️ Transcrição e identificação concluídas!")
-                except Exception as e:
-                    st.error(f"Falha na transcrição: {e}")
-                    
-        # Rerun to update state values and render downstream downloads
-        st.rerun()
 
-# Display Results Section if data is available
-if st.session_state["preprocessed_audio_path"] and st.session_state["transcription_text"]:
-    # Using a single native container for results
+# ==========================================
+# PÁGINA 1: GRAVAÇÃO E TRANSCRIÇÃO (Seu código original)
+# ==========================================
+def pagina_gravacao():
+    st.markdown("### 🎙️ Gravar Consulta")
+    st.write("Clique no botão abaixo para gravar a consulta. O áudio será processado e transcrevido automaticamente ao finalizar.")
+
+    # Use native container with border and background styling
     with st.container(border=True):
-        st.markdown("### 📋 Diálogo da Consulta Processada")
+        audio_data = mic_recorder(
+            start_prompt="🔴 Iniciar Gravação",
+            stop_prompt="⏹️ Finalizar e Processar",
+            just_once=False,
+            use_container_width=True,
+            format="wav",
+            key="mic_recorder_component"
+        )
+
+    # Check if a new recording has been sent from the browser
+    if audio_data is not None:
+        current_bytes = audio_data["bytes"]
         
-        # Display audio player for the doctor to listen to the optimized recording
-        st.markdown("#### 🎧 Áudio Clínico Otimizado")
-        with open(st.session_state["preprocessed_audio_path"], "rb") as audio_file:
-            st.audio(audio_file.read(), format="audio/wav")
+        # Detect if it's a new audio session
+        if current_bytes != st.session_state["last_processed_audio_bytes"]:
+            # Rule: Deletes the last report and last audio file automatically
+            clear_previous_files()
             
-        st.markdown("#### 💬 Transcrição de Vozes")
-        
-        # Construct the ENTIRE transcript box as a single HTML block
-        # We write these strings as single-line elements to prevent leading indentation spaces 
-        # from triggering markdown code block formatting in Streamlit's parser.
-        chat_html = '<div class="chat-container">'
-        for line in st.session_state["transcription_text"].split("\n"):
-            if not line.strip():
-                continue
-            time_stamp, speaker, text_content = parse_line(line)
+            # Reset local session states
+            st.session_state["last_processed_audio_bytes"] = current_bytes
+            st.session_state["preprocessed_audio_path"] = None
+            st.session_state["transcription_text"] = None
+            st.session_state["transcription_path"] = None
             
-            if speaker and time_stamp:
-                if "SPEAKER_A" in speaker or "SPEAKER_0" in speaker:
-                    chat_html += (
-                        f'<div class="chat-bubble bubble-1">'
-                        f'<div class="bubble-meta"><span class="bubble-speaker-1">Orador 1</span><span>⏱️ {time_stamp}</span></div>'
-                        f'<div class="bubble-text">{text_content}</div>'
-                        f'</div>'
-                    )
-                elif "SPEAKER_B" in speaker or "SPEAKER_1" in speaker:
-                    chat_html += (
-                        f'<div class="chat-bubble bubble-2">'
-                        f'<div class="bubble-meta"><span class="bubble-speaker-2">Orador 2</span><span>⏱️ {time_stamp}</span></div>'
-                        f'<div class="bubble-text">{text_content}</div>'
-                        f'</div>'
-                    )
-                else:
-                    chat_html += (
-                        f'<div class="chat-bubble bubble-generic">'
-                        f'<div class="bubble-meta"><span class="bubble-speaker-generic">{speaker}</span><span>⏱️ {time_stamp}</span></div>'
-                        f'<div class="bubble-text">{text_content}</div>'
-                        f'</div>'
-                    )
-            else:
-                chat_html += f'<div style="color: #64748B; font-style: italic; padding: 4px 8px;">{line}</div>'
-                
-        chat_html += '</div>'
-        
-        # Render the entire dialogue container in a single markdown block
-        st.markdown(chat_html, unsafe_allow_html=True)
-        
-        # Action buttons for downloading preprocessed outputs
-        col_audio, col_txt = st.columns(2)
-        wav_filename = os.path.basename(st.session_state["preprocessed_audio_path"])
-        txt_filename = os.path.basename(st.session_state["transcription_path"])
-        
-        with col_audio:
+            # Step 1: Preprocess with FFmpeg
+            with st.spinner("🧹 Limpando áudio e ajustando frequências (FFmpeg)..."):
+                try:
+                    mime_type = audio_data.get("format", "audio/webm")
+                    final_wav = save_and_preprocess(current_bytes, mime_type)
+                    st.session_state["preprocessed_audio_path"] = final_wav
+                    st.success("✔️ Áudio pré-processado com sucesso!")
+                except Exception as e:
+                    st.error(f"Falha ao pré-processar o áudio: {e}")
+            
+            # Step 2: Transcribe via AssemblyAI with Diarization
+            if st.session_state["preprocessed_audio_path"]:
+                with st.spinner("☁️ Analisando e identificando vozes (AssemblyAI)..."):
+                    try:
+                        txt, txt_path = transcribe_audio(st.session_state["preprocessed_audio_path"])
+                        st.session_state["transcription_text"] = txt
+                        st.session_state["transcription_path"] = txt_path
+                        st.success("✔️ Transcrição e identificação concluídas!")
+                    except Exception as e:
+                        st.error(f"Falha na transcrição: {e}")
+                        
+            # Rerun to update state values and render downstream downloads
+            st.rerun()
+
+    # Display Results Section if data is available
+    if st.session_state["preprocessed_audio_path"] and st.session_state["transcription_text"]:
+        with st.container(border=True):
+            st.markdown("### 📋 Diálogo da Consulta Processada")
+            
+            st.markdown("#### 🎧 Áudio Clínico Otimizado")
             with open(st.session_state["preprocessed_audio_path"], "rb") as audio_file:
-                st.download_button(
-                    label="📥 Baixar Áudio Otimizado (.wav)",
-                    data=audio_file.read(),
-                    file_name=wav_filename,
-                    mime="audio/wav",
-                    use_container_width=True,
-                    type="primary"
-                )
+                st.audio(audio_file.read(), format="audio/wav")
                 
-        with col_txt:
-            with open(st.session_state["transcription_path"], "r", encoding="utf-8") as txt_file:
+            st.markdown("#### 💬 Transcrição de Vozes")
+            
+            chat_html = '<div class="chat-container">'
+            for line in st.session_state["transcription_text"].split("\n"):
+                if not line.strip():
+                    continue
+                time_stamp, speaker, text_content = parse_line(line)
+                
+                if speaker and time_stamp:
+                    if "SPEAKER_A" in speaker or "SPEAKER_0" in speaker:
+                        chat_html += (
+                            f'<div class="chat-bubble bubble-1">'
+                            f'<div class="bubble-meta"><span class="bubble-speaker-1">Orador 1</span><span>⏱️ {time_stamp}</span></div>'
+                            f'<div class="bubble-text">{text_content}</div>'
+                            f'</div>'
+                        )
+                    elif "SPEAKER_B" in speaker or "SPEAKER_1" in speaker:
+                        chat_html += (
+                            f'<div class="chat-bubble bubble-2">'
+                            f'<div class="bubble-meta"><span class="bubble-speaker-2">Orador 2</span><span>⏱️ {time_stamp}</span></div>'
+                            f'<div class="bubble-text">{text_content}</div>'
+                            f'</div>'
+                        )
+                    else:
+                        chat_html += (
+                            f'<div class="chat-bubble bubble-generic">'
+                            f'<div class="bubble-meta"><span class="bubble-speaker-generic">{speaker}</span><span>⏱️ {time_stamp}</span></div>'
+                            f'<div class="bubble-text">{text_content}</div>'
+                            f'</div>'
+                        )
+                else:
+                    chat_html += f'<div style="color: #64748B; font-style: italic; padding: 4px 8px;">{line}</div>'
+                    
+            chat_html += '</div>'
+            
+            st.markdown(chat_html, unsafe_allow_html=True)
+            
+            col_audio, col_txt = st.columns(2)
+            wav_filename = os.path.basename(st.session_state["preprocessed_audio_path"])
+            txt_filename = os.path.basename(st.session_state["transcription_path"])
+            
+            with col_audio:
+                with open(st.session_state["preprocessed_audio_path"], "rb") as audio_file:
+                    st.download_button(
+                        label="📥 Baixar Áudio (.wav)",
+                        data=audio_file.read(),
+                        file_name=wav_filename,
+                        mime="audio/wav",
+                        use_container_width=True,
+                        type="primary"
+                    )
+                    
+            with col_txt:
+                with open(st.session_state["transcription_path"], "r", encoding="utf-8") as txt_file:
+                    st.download_button(
+                        label="📥 Baixar Transcrição (.txt)",
+                        data=txt_file.read(),
+                        file_name=txt_filename,
+                        mime="text/plain",
+                        use_container_width=True,
+                        type="primary"
+                    )
+    else:
+        st.info("Nenhuma consulta ativa no momento. Utilize o gravador acima para iniciar.")
+
+
+# ==========================================
+# PÁGINA 2: GERAÇÃO DE RELATÓRIO
+# ==========================================
+def pagina_geracao_relatorio():
+    st.markdown("### 📄 Geração de Relatório Clínico")
+    st.write("Faça o upload dos laudos em PDF e do áudio processado da consulta.")
+
+    with st.container(border=True):
+        pdfs_enviados = st.file_uploader("Upload de Exames/Laudos (PDF)", type=["pdf"], accept_multiple_files=True)
+        audio_enviado = st.file_uploader("Upload do Áudio da Consulta (.wav)", type=["wav", "mp3", "m4a"])
+
+        if st.button("Gerar Relatório Clínico", type="primary", use_container_width=True):
+            if not audio_enviado:
+                st.warning("Por favor, envie o arquivo de áudio da consulta.")
+                return
+
+            with st.spinner("1/3 Transcrevendo o áudio..."):
+                # Como a função 'transcribe_audio' espera um caminho de arquivo,
+                # e o st.file_uploader entrega um objeto em memória (BytesIO),
+                # salvamos o arquivo temporariamente para a AssemblyAI processar.
+                temp_audio_path = os.path.join("gravacoes_temporarias", audio_enviado.name)
+                os.makedirs("gravacoes_temporarias", exist_ok=True)
+                with open(temp_audio_path, "wb") as f:
+                    f.write(audio_enviado.getbuffer())
+                
+                texto_transcricao, _ = transcribe_audio(temp_audio_path)
+
+            with st.spinner("2/3 Extraindo textos dos PDFs (via PyMuPDF e OCR)..."):
+                texto_pdfs_combinado = ""
+                for idx, pdf_file in enumerate(pdfs_enviados):
+                    texto_extraido = extrair_texto_pdf(pdf_file.read())
+                    texto_pdfs_combinado += f"\n--- Documento {idx+1} ---\n{texto_extraido}\n"
+
+            with st.spinner("3/3 Analisando com Inteligência Artificial..."):
+                relatorio_final = gerar_nota_clinica(texto_pdfs_combinado, texto_transcricao)
+
+            if relatorio_final:
+                st.success("✔️ Relatório gerado com sucesso!")
+                
+                st.markdown("#### Pré-visualização da Nota")
+                st.text_area("Resultado", value=relatorio_final, height=400, label_visibility="collapsed")
+                
+                docx_buffer = criar_docx_em_memoria(relatorio_final)
+                
                 st.download_button(
-                    label="📥 Baixar Relatório (.txt)",
-                    data=txt_file.read(),
-                    file_name=txt_filename,
-                    mime="text/plain",
-                    use_container_width=True,
-                    type="primary"
+                    label="📥 Baixar Relatório (.docx)",
+                    data=docx_buffer,
+                    file_name="Nota_Clinica.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True
                 )
-else:
-    # Empty State Info when no consultation has been processed in this session
-    st.info("Nenhuma consulta ativa no momento. Utilize o gravador acima para iniciar.")
+
+
+# ==========================================
+# ROTEAMENTO (Controle de Exibição das Páginas)
+# ==========================================
+if menu_selecionado == "🎙️ Gravação e Transcrição":
+    pagina_gravacao()
+elif menu_selecionado == "📄 Geração de Relatório":
+    pagina_geracao_relatorio()
+
 
 # Simple professional footer
 st.markdown(
