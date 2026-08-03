@@ -4,8 +4,7 @@ from PIL import Image
 import io
 import streamlit as st
 from docx import Document
-from docx.shared import Pt
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from htmldocx import HtmlToDocx
 from google import genai
 from google.genai import types
 
@@ -33,7 +32,7 @@ def extrair_texto_pdf(arquivo_bytes) -> str:
     return texto_completo.strip()
 
 def gerar_nota_clinica(texto_pdfs: str, texto_transcricao: str) -> str:
-    """Consome os prompts dos secrets e envia para o Gemini."""
+    """Primeira Camada: Consome os prompts dos secrets e gera o conteúdo clínico (Seu prompt original)."""
     system_instruction = st.secrets["SYSTEM_PROMPT"]
     user_prompt = st.secrets["USER_PROMPT"]
     
@@ -56,61 +55,44 @@ def gerar_nota_clinica(texto_pdfs: str, texto_transcricao: str) -> str:
         st.error(f"Erro na comunicação com o Gemini: {e}")
         return ""
 
-def criar_docx_em_memoria(texto_relatorio: str) -> io.BytesIO:
-    """Gera um arquivo .docx em memória, formatado e pronto para download."""
-    doc = Document()
+def formatar_para_html(texto_cru: str) -> str:
+    """Segunda Camada: Pega a resposta clínica e a transforma em HTML estruturado."""
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
     
-    # Configurar fonte padrão para o documento inteiro (Aparência mais clínica/profissional)
-    style = doc.styles['Normal']
-    font = style.font
-    font.name = 'Arial'
-    font.size = Pt(11)
+    # 1. Puxa as regras de formatação dos secrets
+    instrucao_formatacao = st.secrets["FORMATTER_PROMPT"]
+    
+    # 2. Concatena as regras com o laudo gerado na primeira camada
+    prompt_formatacao = f"{instrucao_formatacao}\n\nTEXTO ORIGINAL:\n{texto_cru}"
+    
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt_formatacao,
+            config=types.GenerateContentConfig(
+                temperature=0.0, # Temperatura 0 para manter fidelidade estrita
+            ),
+        )
+        # Limpeza preventiva caso a IA coloque blocos de código
+        html_limpo = response.text.replace("```html", "").replace("```", "").strip()
+        return html_limpo
+    except Exception as e:
+        st.error(f"Erro na formatação HTML: {e}")
+        return texto_cru # Em caso de erro na IA de formatação, devolve o texto cru para não perder o laudo
 
-    # Título centralizado
-    titulo = doc.add_heading('Nota Clínica - MedScribe', level=1)
-    titulo.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    doc.add_paragraph() # Espaço após o título
+def criar_docx_em_memoria(texto_relatorio: str) -> io.BytesIO:
+    """Usa htmldocx para converter o HTML da IA em um .docx real."""
     
-    # Processar o texto gerado pela IA linha por linha
-    linhas = texto_relatorio.split('\n')
+    # 1. Passa o texto clínico pelo formatador de HTML
+    html_content = formatar_para_html(texto_relatorio)
     
-    for linha in linhas:
-        linha_limpa = linha.strip()
-        
-        # Ignorar linhas completamente vazias para evitar buracos no documento
-        if not linha_limpa:
-            continue
-            
-        # REGRA 1: Se a linha começa com "-" ou "*", transforma em Bullet Point nativo do Word
-        if linha_limpa.startswith('- ') or linha_limpa.startswith('* '):
-            texto_bullet = linha_limpa[2:] # Remove o símbolo do texto
-            p = doc.add_paragraph(style='List Bullet')
-            _adicionar_run_com_negrito(p, texto_bullet)
-            
-        # REGRA 2: Se a linha for curta e terminar com ":", trata como um subtítulo de seção
-        elif linha_limpa.endswith(':') and len(linha_limpa) < 60:
-            p = doc.add_paragraph()
-            p.add_run(linha_limpa).bold = True
-            
-        # REGRA 3: Texto normal (Processando possíveis negritos do Markdown)
-        else:
-            p = doc.add_paragraph()
-            _adicionar_run_com_negrito(p, linha_limpa)
-            
-    # Salvar no buffer
+    # 2. Inicializa o parser e converte direto para um objeto do Word
+    doc = Document()
+    new_parser = HtmlToDocx()
+    new_parser.add_html_to_document(html_content, doc)
+    
+    # 3. Salva em memória
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
-
-def _adicionar_run_com_negrito(paragrafo, texto: str):
-    """Função auxiliar para traduzir o **negrito** do Markdown para o Word."""
-    if '**' in texto:
-        partes = texto.split('**')
-        for i, parte in enumerate(partes):
-            run = paragrafo.add_run(parte)
-            # O texto que estava entre ** sempre cai nos índices ímpares após o split
-            if i % 2 != 0: 
-                run.bold = True
-    else:
-        paragrafo.add_run(texto)
