@@ -4,6 +4,8 @@ from PIL import Image
 import io
 import streamlit as st
 from docx import Document
+from docx.shared import Pt
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from google import genai
 from google.genai import types
 
@@ -55,12 +57,60 @@ def gerar_nota_clinica(texto_pdfs: str, texto_transcricao: str) -> str:
         return ""
 
 def criar_docx_em_memoria(texto_relatorio: str) -> io.BytesIO:
-    """Gera um arquivo .docx em memória pronto para download."""
+    """Gera um arquivo .docx em memória, formatado e pronto para download."""
     doc = Document()
-    doc.add_heading('Consulta', level=1)
-    doc.add_paragraph(texto_relatorio)
     
+    # Configurar fonte padrão para o documento inteiro (Aparência mais clínica/profissional)
+    style = doc.styles['Normal']
+    font = style.font
+    font.name = 'Arial'
+    font.size = Pt(11)
+
+    # Título centralizado
+    titulo = doc.add_heading('Nota Clínica - MedScribe', level=1)
+    titulo.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    doc.add_paragraph() # Espaço após o título
+    
+    # Processar o texto gerado pela IA linha por linha
+    linhas = texto_relatorio.split('\n')
+    
+    for linha in linhas:
+        linha_limpa = linha.strip()
+        
+        # Ignorar linhas completamente vazias para evitar buracos no documento
+        if not linha_limpa:
+            continue
+            
+        # REGRA 1: Se a linha começa com "-" ou "*", transforma em Bullet Point nativo do Word
+        if linha_limpa.startswith('- ') or linha_limpa.startswith('* '):
+            texto_bullet = linha_limpa[2:] # Remove o símbolo do texto
+            p = doc.add_paragraph(style='List Bullet')
+            _adicionar_run_com_negrito(p, texto_bullet)
+            
+        # REGRA 2: Se a linha for curta e terminar com ":", trata como um subtítulo de seção
+        elif linha_limpa.endswith(':') and len(linha_limpa) < 60:
+            p = doc.add_paragraph()
+            p.add_run(linha_limpa).bold = True
+            
+        # REGRA 3: Texto normal (Processando possíveis negritos do Markdown)
+        else:
+            p = doc.add_paragraph()
+            _adicionar_run_com_negrito(p, linha_limpa)
+            
+    # Salvar no buffer
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
+
+def _adicionar_run_com_negrito(paragrafo, texto: str):
+    """Função auxiliar para traduzir o **negrito** do Markdown para o Word."""
+    if '**' in texto:
+        partes = texto.split('**')
+        for i, parte in enumerate(partes):
+            run = paragrafo.add_run(parte)
+            # O texto que estava entre ** sempre cai nos índices ímpares após o split
+            if i % 2 != 0: 
+                run.bold = True
+    else:
+        paragrafo.add_run(texto)
