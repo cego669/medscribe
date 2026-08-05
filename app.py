@@ -258,6 +258,25 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Initialize Session States for Prompts
+if "sys_prompt_edit" not in st.session_state:
+    try:
+        st.session_state["sys_prompt_edit"] = st.secrets["SYSTEM_PROMPT"]
+    except KeyError:
+        st.session_state["sys_prompt_edit"] = ""
+
+if "user_prompt_edit" not in st.session_state:
+    try:
+        st.session_state["user_prompt_edit"] = st.secrets["USER_PROMPT"]
+    except KeyError:
+        st.session_state["user_prompt_edit"] = ""
+
+if "formatter_prompt_edit" not in st.session_state:
+    try:
+        st.session_state["formatter_prompt_edit"] = st.secrets["FORMATTER_PROMPT"]
+    except KeyError:
+        st.session_state["formatter_prompt_edit"] = ""
+
 # Initialize Session States for Audio and Transcripts
 if "last_processed_audio_bytes" not in st.session_state:
     st.session_state["last_processed_audio_bytes"] = None
@@ -429,6 +448,12 @@ def pagina_gravacao():
 def pagina_geracao_relatorio():
     st.markdown("### 📄 Geração de Relatório Clínico")
     st.write("Faça o upload dos laudos em PDF e do áudio processado da consulta.")
+
+    with st.expander("⚙️ Ajuste Fino de Prompts (Desenvolvimento)"):
+        st.info("💡 Modo de Refinamento: As edições feitas aqui são temporárias e valem apenas enquanto você estiver logado. Se encontrar uma versão melhor do prompt, lembre-se de copiá-la e salvá-la em um arquivo de texto externo para uso futuro.")
+        st.text_area("Prompt de Sistema (Clínico)", key="sys_prompt_edit", height=300)
+        st.text_area("Prompt de Usuário", key="user_prompt_edit", height=300)
+        st.text_area("Prompt de Formatação HTML", key="formatter_prompt_edit", height=300)
 
     with st.container(border=True):
         pdfs_enviados = st.file_uploader("Upload de Exames/Laudos (PDF)", type=["pdf"], accept_multiple_files=True)
