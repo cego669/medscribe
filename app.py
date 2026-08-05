@@ -258,24 +258,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Initialize Session States for Prompts
-if "sys_prompt_edit" not in st.session_state:
-    try:
-        st.session_state["sys_prompt_edit"] = st.secrets["SYSTEM_PROMPT"]
-    except KeyError:
-        st.session_state["sys_prompt_edit"] = ""
-
-if "user_prompt_edit" not in st.session_state:
-    try:
-        st.session_state["user_prompt_edit"] = st.secrets["USER_PROMPT"]
-    except KeyError:
-        st.session_state["user_prompt_edit"] = ""
-
-if "formatter_prompt_edit" not in st.session_state:
-    try:
-        st.session_state["formatter_prompt_edit"] = st.secrets["FORMATTER_PROMPT"]
-    except KeyError:
-        st.session_state["formatter_prompt_edit"] = ""
+# Removed global initialization to prevent st.secrets loading issues.
 
 # Initialize Session States for Audio and Transcripts
 if "last_processed_audio_bytes" not in st.session_state:
@@ -448,6 +431,14 @@ def pagina_gravacao():
 def pagina_geracao_relatorio():
     st.markdown("### 📄 Geração de Relatório Clínico")
     st.write("Faça o upload dos laudos em PDF e do áudio processado da consulta.")
+
+    # Initialize Session States for Prompts inside the function to ensure secrets are loaded
+    if "sys_prompt_edit" not in st.session_state:
+        st.session_state["sys_prompt_edit"] = st.secrets.get("SYSTEM_PROMPT", "")
+    if "user_prompt_edit" not in st.session_state:
+        st.session_state["user_prompt_edit"] = st.secrets.get("USER_PROMPT", "")
+    if "formatter_prompt_edit" not in st.session_state:
+        st.session_state["formatter_prompt_edit"] = st.secrets.get("FORMATTER_PROMPT", "")
 
     with st.expander("⚙️ Ajuste Fino de Prompts (Desenvolvimento)"):
         st.info("💡 Modo de Refinamento: As edições feitas aqui são temporárias e valem apenas enquanto você estiver logado. Se encontrar uma versão melhor do prompt, lembre-se de copiá-la e salvá-la em um arquivo de texto externo para uso futuro.")
