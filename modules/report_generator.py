@@ -33,8 +33,8 @@ def extrair_texto_pdf(arquivo_bytes) -> str:
 
 def gerar_nota_clinica(texto_pdfs: str, texto_transcricao: str) -> str:
     """Primeira Camada: Consome os prompts dos secrets e gera o conteúdo clínico (Seu prompt original)."""
-    system_instruction = st.secrets["SYSTEM_PROMPT"]
-    user_prompt = st.secrets["USER_PROMPT"]
+    system_instruction = st.session_state.get("sys_prompt_edit", st.secrets.get("SYSTEM_PROMPT", ""))
+    user_prompt = st.session_state.get("user_prompt_edit", st.secrets.get("USER_PROMPT", ""))
     
     prompt_final = f"{user_prompt}\n\nEis os documentos (Laudos/Exames):\n{texto_pdfs}\n\nEis a transcrição da consulta:\n{texto_transcricao}"
     
@@ -60,7 +60,7 @@ def formatar_para_html(texto_cru: str) -> str:
     client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
     
     # 1. Puxa as regras de formatação dos secrets
-    instrucao_formatacao = st.secrets["FORMATTER_PROMPT"]
+    instrucao_formatacao = st.session_state.get("formatter_prompt_edit", st.secrets.get("FORMATTER_PROMPT", ""))
     
     # 2. Concatena as regras com o laudo gerado na primeira camada
     prompt_formatacao = f"{instrucao_formatacao}\n\nTEXTO ORIGINAL:\n{texto_cru}"
